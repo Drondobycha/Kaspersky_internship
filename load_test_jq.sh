@@ -31,7 +31,7 @@ for i in $(seq 1 $COUNT); do
       -o /dev/null \
       -w "HTTP Status: %{http_code}, Time: %{time_total}s\n"
     
-    #sleep 0.1
+    sleep 0.1
 done
 
 echo "Load test completed!"

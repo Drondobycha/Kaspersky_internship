@@ -66,7 +66,10 @@ func (q *Queue) worker(ctx context.Context, id int) {
 	log.Printf("Worker: %d start work", id)
 	for {
 		select {
-		case task := <-q.tasks:
+		case task, ok := <-q.tasks:
+			if !ok {
+				return // Канал закрыт
+			}
 			q.processTask(ctx, task)
 		case <-ctx.Done():
 			return
@@ -89,6 +92,12 @@ func (q *Queue) processTask(ctx context.Context, task *Task) {
 			log.Printf("Retrying task %s (attempt %d/%d)", task.ID, attempt, task.MaxRetries+1)
 		}
 
+		if err := ctx.Err(); err != nil {
+			task.Status = StatusFailed
+			task.Error = "cancelled during processing"
+			return
+		}
+
 		err = q.handler(ctx, task)
 		if err == nil {
 			task.Status = StatusDone
@@ -107,13 +116,13 @@ func (q *Queue) processTask(ctx context.Context, task *Task) {
 			break
 		}
 
-		// Exponential backoff with jitter
+		// экспоненциальный бекоф с джиттером
 		delay := ExponentialBackoffWithJitter(attempt, 100*time.Millisecond, 5*time.Second)
 		log.Printf("Task %s failed (attempt %d), retrying in %v: %v", task.ID, attempt, delay, err)
 
 		select {
 		case <-time.After(delay):
-			// Retry after delay
+			// повтор после задержки
 		case <-ctx.Done():
 			task.Status = StatusFailed
 			log.Printf("Task %s cancelled due to context cancellation", task.ID)

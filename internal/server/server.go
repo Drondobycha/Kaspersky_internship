@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -21,7 +20,7 @@ type Server struct {
 	queue      *queue.Queue
 	config     *config.Config
 	shutdown   chan struct{}
-	wg         sync.WaitGroup
+	// wg         sync.WaitGroup
 }
 
 type EnqueueRequest struct {
@@ -121,6 +120,7 @@ func (s *Server) handleEnqueue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	//получение сатистики
 	stats := s.queue.GetStats()
 
 	response := HealthResponse{
@@ -135,11 +135,11 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Start() error {
-	// Start workers
+	// запуск воркеров
 	ctx := context.Background()
 	s.queue.StartWorkers(ctx, s.config.WorkersCount)
 
-	// Start HTTP server
+	// запуск сервера
 	go func() {
 		log.Printf("Starting server on %s", s.config.ServerAddr)
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -147,7 +147,7 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	// Handle shutdown signals
+	// обработчик сигнала остановки
 	return s.waitForShutdown()
 }
 
@@ -166,19 +166,34 @@ func (s *Server) waitForShutdown() error {
 }
 
 func (s *Server) Stop() error {
-	log.Printf("Stopping queue...")
-	s.queue.Stop()
+	log.Printf("Initiating graceful shutdown...")
 
-	log.Printf("Stopping HTTP server...")
+	// 1. Останавливаем HTTP сервер с таймаутом
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
-		return err
 	}
 
-	log.Printf("Server stopped gracefully")
+	// 2. Останавливаем очередь с таймаутом
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
+
+	done := make(chan struct{})
+	go func() {
+		s.queue.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Printf("Queue stopped gracefully")
+	case <-stopCtx.Done():
+		log.Printf("Warning: queue did not stop in time")
+	}
+
+	log.Printf("Server stopped")
 	return nil
 }
 

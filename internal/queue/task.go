@@ -36,7 +36,7 @@ type TaskResult struct {
 
 type TaskHandler func(ctx context.Context, task *Task) error
 
-// ExponentialBackoffWithJitter calculates delay with exponential backoff and jitter
+// ExponentialBackoffWithJitter вычисляет задержку с экспоненциальным бекофом и "тряской"
 func ExponentialBackoffWithJitter(attempt int, baseDelay time.Duration, maxDelay time.Duration) time.Duration {
 	if attempt <= 0 {
 		return baseDelay
@@ -52,12 +52,12 @@ func ExponentialBackoffWithJitter(attempt int, baseDelay time.Duration, maxDelay
 	jitterFactor := 0.5 + rand.Float64() // 0.5 to 1.5
 	delay := time.Duration(exponential * jitterFactor)
 
-	// Cap at max delay
+	// Juhfybxbdftv vfrcbvfkmye. pflth;re
 	if delay > maxDelay {
 		return maxDelay
 	}
 
-	// Ensure minimum delay is at least baseDelay for attempt 1+
+	// Проверяем что минимальная задержка не меньше BaseDelay для первой попытки
 	if attempt > 1 && delay < baseDelay {
 		return baseDelay
 	}
