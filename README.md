@@ -23,9 +23,9 @@
 ### Сборка
 
 ```bash
-git clone <repository-url>
-cd task-queue
-go build -o bin/server cmd/server/main.go
+git clone <https://github.com/Drondobycha/Kaspersky_internship.git>
+cd Kaspersky_internship
+go build -o bin/server cmd/main.go
 ```
 
 ---
